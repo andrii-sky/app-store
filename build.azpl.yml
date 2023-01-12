@@ -1,0 +1,47 @@
+variables:
+  - template: azpl/semver.azpl.yml@shared
+    parameters: { majorVersion: 31, minorVersion: 2 }
+name: $(semver)
+
+resources:
+  repositories:
+    - repository: shared
+      type: github
+      endpoint: skytvnz
+      name: skytvnz/shared-build-scripts
+      ref: refs/tags/1.22
+
+pr:
+  branches:
+    include:
+      - '*'
+trigger:
+  branches:
+    include:
+      - master
+
+pool:
+  name: aws-linux-v1
+
+stages:
+  - stage: Build
+    jobs:
+      - job: Build
+        steps:
+          - task: NodeTool@0
+            displayName: Set nodejs version
+            inputs:
+              versionSpec: 16.17
+          - template: azpl/web/yarn-install-steps.azpl.yml@shared
+          - template: azpl/web/yarn-test-steps.azpl.yml@shared
+          - bash: |
+              set -Eeuxo pipefail
+              # Ideally we'd tag the repo with the build version on master builds, but we'd also need to set up the pipeline to push back to git
+              yarn version --new-version $(Build.BuildNumber) --no-git-tag-version
+              yarn build
+            displayName: yarn build
+
+          - bash: npm publish
+            displayName: npm publish
+            # This makes it possible to publish a app version from a branch build by manually invoking the pipeline for a given branch.
+            condition: ne(variables['Build.Reason'], 'PullRequest')

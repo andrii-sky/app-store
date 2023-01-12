@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES5",
+    "lib": ["ESNext"],
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noImplicitAny": false,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./lib",
+    "baseUrl": "src",
+    "paths": {
+      "@/*": ["./*"]
+    },
+    "plugins": [
+      { "transform": "typescript-transform-paths" },
+      { "transform": "typescript-transform-paths", "afterDeclarations": true }
+    ]
+  },
+  "include": ["src"]
+}

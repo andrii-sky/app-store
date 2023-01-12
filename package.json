@@ -1,0 +1,130 @@
+{
+  "name": "@skytvnz/sky-app-store",
+  "version": "0.0.0",
+  "license": "UNLICENSED",
+  "publishConfig": {
+    "registry": "https://skydigital.jfrog.io/skydigital/api/npm/npm/"
+  },
+  "main": "lib/index.js",
+  "files": [
+    "lib"
+  ],
+  "engines": {
+    "node": ">=14.0.0 <17",
+    "yarn": ">=1.19.0"
+  },
+  "scripts": {
+    "start": "yarn compile --watch",
+    "test": "node scripts/test.js",
+    "test:all": "jest --watchAll --coverage",
+    "serve:coverage": "superstatic --port 5000 ./coverage/lcov-report",
+    "lint": "cross-env NODE_ENV=development eslint --fix \"src/**/*.{js,jsx,ts,tsx}\"",
+    "lint:types": "ttsc --project tsconfig.json --noEmit",
+    "compile": "ttsc --project tsconfig.build.json",
+    "clean": "rm -rf lib",
+    "build": "yarn clean && yarn compile",
+    "sonar": "node_modules/sonarqube-scanner/dist/bin/sonar-scanner",
+    "graph-ql-schema-gen": "graphql-codegen --config graph-ql-schema-gen.yml"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "cross-env NODE_ENV=development lint-staged",
+      "pre-push": "yarn lint --max-warnings 0 && yarn lint:types && yarn test --watchAll=false --coverage=false"
+    }
+  },
+  "lint-staged": {
+    "src/**/*.{json,css,scss,md}": [
+      "prettier --write"
+    ],
+    "src/**/*.{js,jsx,ts,tsx}": [
+      "eslint --fix"
+    ]
+  },
+  "dependencies": {
+    "@reduxjs/toolkit": "1.3.6",
+    "axios": "0.19.2",
+    "class-transformer": "0.2.3",
+    "dayjs": "^1.8.30",
+    "envkey": "1.2.7",
+    "graphql": "^15.2.0",
+    "graphql-request": "^4.3.0",
+    "graphql-tag": "^2.10.3",
+    "immer": "6.0.9",
+    "iso8601-duration": "^1.2.0",
+    "jwt-decode": "^3.1.2",
+    "lodash.memoize": "^4.1.2",
+    "lodash.values": "^4.3.0",
+    "lodash.throttle": "4.1.1",
+    "lodash.isequal": "4.5.0",
+    "pomeranian-durations": "^1.10.0",
+    "ramda": "0.27.0",
+    "redux": "4.0.5",
+    "redux-devtools-extension": "2.13.8",
+    "redux-persist": "^6.0.0",
+    "redux-thunk": "2.3.0",
+    "reflect-metadata": "0.1.13",
+    "reselect": "4.0.0"
+  },
+  "peerDependencies": {
+    "react": "*",
+    "react-redux": "*",
+    "react-dom": "*"
+  },
+  "devDependencies": {
+    "@babel/core": "7.9.0",
+    "@graphql-codegen/cli": "1.15.4",
+    "@graphql-codegen/introspection": "^1.16.0",
+    "@graphql-codegen/typescript": "1.15.4",
+    "@graphql-codegen/typescript-operations": "1.15.4",
+    "@types/axios": "0.14.0",
+    "@types/jest": "25.2.1",
+    "@types/node": "13.11.1",
+    "@types/ramda": "0.27.3",
+    "@types/redux": "3.6.0",
+    "@types/redux-mock-store": "1.0.2",
+    "@types/redux-thunk": "2.1.0",
+    "@typescript-eslint/eslint-plugin": "2.27.0",
+    "@typescript-eslint/parser": "2.27.0",
+    "babel-eslint": "10.1.0",
+    "babel-jest": "25.3.0",
+    "babel-plugin-module-resolver": "4.0.0",
+    "babel-preset-react-app": "9.1.2",
+    "camelcase": "6.0.0",
+    "cross-env": "7.0.2",
+    "eslint": "6.8.0",
+    "eslint-config-airbnb-typescript": "7.2.0",
+    "eslint-config-prettier": "6.10.1",
+    "eslint-config-react-app": "5.2.1",
+    "eslint-import-resolver-babel-module": "5.1.2",
+    "eslint-import-resolver-typescript": "2.0.0",
+    "eslint-plugin-flowtype": "4.7.0",
+    "eslint-plugin-import": "2.20.2",
+    "eslint-plugin-jest": "23.8.2",
+    "eslint-plugin-jsx-a11y": "6.2.3",
+    "eslint-plugin-prettier": "3.1.2",
+    "eslint-plugin-ramda": "2.5.1",
+    "eslint-plugin-react": "7.19.0",
+    "eslint-plugin-react-hooks": "3.0.0",
+    "husky": "4.2.3",
+    "identity-obj-proxy": "3.0.0",
+    "jest": "25.3.0",
+    "jest-environment-jsdom-fourteen": "1.0.1",
+    "jest-junit": "11.1.0",
+    "jest-mock-axios": "3.2.0",
+    "jest-resolve": "25.3.0",
+    "jest-watch-typeahead": "0.5.0",
+    "lint-staged": "10.1.2",
+    "prettier": "2.0.4",
+    "react": "16.13.1",
+    "react-redux": "7.2.0",
+    "react-dom": "16.13.1",
+    "react-app-polyfill": "1.0.6",
+    "redux-mock-store": "1.5.4",
+    "semver": "7.2.1",
+    "sonarqube-scanner": "2.6.0",
+    "superstatic": "6.0.4",
+    "ttypescript": "1.5.10",
+    "typescript": "3.8.3",
+    "typescript-transform-paths": "1.1.14"
+  }
+}

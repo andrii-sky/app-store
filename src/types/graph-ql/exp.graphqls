@@ -1,0 +1,1622 @@
+# https://github.com/skytvnz/sky-one-backend/blob/master/exp-api/impl/service/src/main/resources/exp.graphqls
+# https://github.com/skytvnz/sky-one-backend/blob/master/graphqls/src/main/resources/graphqls/shared.graphqls
+
+# Sky digital experience API
+# The user profile, if any, is identified by the authentication layer rather than with query parameters
+
+# Sky One experience API
+
+# Sky One experience API
+
+# Sky One experience API
+
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+type Query {
+  experience(appId: AppId!): SkyExperience!
+
+  # Top level sections
+  rootSections: [Section]!
+  section(id: ID!): Section
+  group(id: ID!): Group
+
+  # Locate content by url
+  webPage(path: URIPath!): WebPage
+
+  search(term: String!): SearchResults!
+  title(id: ID!): Title
+  show(id: ID!): Show
+  episode(id: ID!): Episode
+  movie(id: ID!): Movie
+  collection(id: ID!): Collection
+
+  channels: [Channel]!
+  channelGroups: [ChannelGroup]!
+  channelGroup(id: ID!): ChannelGroup
+
+  linearChannel(id: ID!): LinearChannel
+
+  # @Dprecated use channel equivalents defined above.
+  linearChannels: [LinearChannel]!
+  linearChannelGroups: [LinearChannelGroup]!
+  linearChannelGroup(id: ID!): LinearChannelGroup
+
+  """
+  Return null if the slot does not exist
+  Note: The same slotId may return a different episode/programme over time. This is because the upstream
+  systems de-link and associate other programmes to the already alloocated slot. So the frontend should always
+  check for the programme details. If they are changed, then any details that are already persisted should be discarded.
+  """
+  linearChannelSlot(id: ID!): LinearSlot
+
+  recentChannels: [LinearChannel]!
+  myList: [MyListContent]!
+  user: User!
+  customer: CustomerAccount!
+  # Returns list of all available customerProfielAvatars configured in CMS for customers to select.
+  customerProfileAvatarGroups: [CustomerProfileAvatarGroup]!
+
+  """
+  Return all apps the API is aware of for this profile:
+  - recently opened
+  - favourited
+  - mandatory (uninstallable)
+
+  This may include apps that are not installed on the box, and it won't contain all apps that are installed.
+
+  Order will be in display order as defined by curators, then by favourite, then by recently used.
+  """
+  myBoxApps: [BoxApp]! @deprecated
+  getOfflinePlayback(assetId: ID!): VodPlaybackResponse!
+
+  # Capture extra device details for determining rendition. Ideally these should have been captured during device registration but thats a
+  # imporvement for future. See https://skynz.atlassian.net/browse/SAAA-4702
+  getOfflineVodPlayback(
+    assetId: ID!
+    deviceId: ID!
+    playbackDevice: PlaybackDevice
+  ): VodPlaybackResponse!
+}
+
+type SkyExperience {
+  appId: AppId!
+  config: AppConfiguration!
+}
+
+type AppConfiguration {
+  auth: AppAuthConfiguration!
+}
+
+type AppAuthConfiguration {
+  connectionId: ID!
+}
+
+enum AppId {
+  SKY_BOX
+  SKY_GO_ANDROID_MOBILE
+  SKY_GO_IOS
+  SKY_GO_WEB
+  SKY_POD
+}
+
+type Mutation {
+  savePlaybackPosition(assetId: ID!, position: Duration!): WatchProgress!
+  removeAllPlaybackPositions: Void
+  saveRecentChannel(channelId: ID!): Void
+  removeAllRecentChannels: Void
+
+  addToMyList(id: ID!): Void
+  removeFromMyList(id: ID!): Void
+  removeAllFromMyList: Void
+
+  # deviceId is temporarily optional as a way to opt in/out of concurrency enforcement
+  startLinearPlayback(channelId: ID!, deviceId: ID!): LinearPlaybackResponse!
+
+  # Capture extra device details for determining rendition. Ideally these should have been captured during device registration but thats a
+  # imporvement for future. See https://skynz.atlassian.net/browse/SAAA-4702
+  startVodPlayback(
+    assetId: ID!
+    deviceId: ID!
+    playbackDevice: PlaybackDevice
+  ): VodPlaybackResponse!
+
+  linearPlaybackHeartbeat(channelId: ID!, deviceId: ID!): PlaybackHeartbeatResponse
+  vodPlaybackHeartbeat(assetId: ID!, deviceId: ID!): PlaybackHeartbeatResponse
+
+  stopLinearPlayback(channelId: ID!, deviceId: ID!): Void
+  stopVodPlayback(assetId: ID!, deviceId: ID!): Void
+
+  # Changing RegisterDeviceInput as optional for backward compatibility.
+  registerDevice(registerDevice: RegisterDeviceInput): RegisterDeviceResponse!
+  updateDeviceName(deviceId: ID!, deviceName: String!): Device!
+  deactivateDevice(deviceId: ID!): DeactivateDeviceResponse!
+  removeAllDevices: Void
+
+  # Sky Decoder Activation - serialNumber is same as SkyDecoderBox.id
+  activateSkyDecoder(serialNumber: ID!, chipId: ID!): SkyDecoderActivationResponse!
+
+  # Sends a record request to customer set top box through Sky BRBS remote record system
+  record(record: RecordInput!): Void
+
+  # pin = an integer between 0 (0000) and 9999, returns true if pin was correct
+  # deprecated in favour of validateParentalPin
+  enterParentalPin(enteredPin: String!): Boolean!
+  # pin = an integer between 0 (0000) and 9999, returns true if pin was correct, false if it's not or error if too many attempts were made
+  validateParentalPin(enteredPin: String!): PinValidationResponse
+  # pin = an integer between 0 (0000) and 9999
+  setParentalPin(pin: String!): Void
+  resetParentalPin: Void
+  setParentalControl(enabled: Boolean!): Void
+  setParentallyApprovedClassification(code: Classification!): Void
+
+  """
+  Mark an app as favourited for this profile.
+  Returns true if the app was unfavourited, false if it was not.
+  """
+  favouriteBoxApp(appId: ID!): Boolean!
+  """
+  Remove an app from this profile's favourites, if present.
+  Returns true if the app was favourited, false if it was not.
+  """
+  unfavouriteBoxApp(appId: ID!): Boolean!
+
+  """
+  Record an app being opened by this profile, to track recently used apps.
+  """
+  boxAppOpened(appId: ID!): DateTime!
+
+  # removes box app from user data store
+  forgetBoxApp(appId: ID!): Void
+
+  forgetAllBoxApps: Void
+
+  # Removes all user attributes stored in dyanmodb database.
+  removeAllUserAttributes: Void
+
+  createProfile(
+    name: String!
+    """
+     If null, a default customerProfileAvatar will be assigned
+    """
+    avatar: ID
+  ): CreateCustomerProfileResponse!
+
+  updateProfile(id: ID!, name: String!, avatar: ID!): CustomerProfile!
+
+  deleteProfile(id: ID!): Void
+
+  purchaseTvod(
+    """
+    Currently playback of purchases is limited to the device they are purchased on.
+    """
+    deviceId: ID!
+    tvodOfferId: ID!
+  ): PurchaseTvodResponse!
+
+  """
+  Removes an active tvod purchase for this customer. Because MSL do not expose a reverse purchase API, this will not
+  actually reverse the charge in ICOMS, but just remove it from the view of this API. As a result, this is currently only
+  useful for test purposes, and will return an error if used in a production environment.
+  """
+  reverseTvodPurchase(deviceId: ID!, tvodOfferId: ID!): Void
+
+  purchasePayPerView(
+    """
+    Currently playback of purchases is limited to the device they are purchased on.
+    """
+    deviceId: ID!
+    payPerViewOfferId: ID!
+  ): PurchasePayPerViewResponse!
+
+  """
+  Removes an active tvod purchase for this customer. Because MSL do not expose a reverse purchase API, this will not
+  actually reverse the charge in ICOMS, but just remove it from the view of this API. As a result, this is currently only
+  useful for test purposes, and will return an error if used in a production environment.
+  """
+  reversePayPerViewPurchase(deviceId: ID!, payPerViewOfferId: ID!): Void
+
+  """
+  Mark a notification as consumed, which indications it has been actioned or read by the customer.
+
+  If the notification is already consumed, this does nothing.
+
+  Returns the updated list of non-consumed notifications for the account.
+  """
+  consumeCustomerNotification(
+    """
+    The ID of a CustomerProfileNotification
+    """
+    id: ID!
+  ): [CustomerNotification!]!
+}
+
+union CollectionMember = Show | Movie | LinearChannel | Collection
+union GroupMember = Show | Movie | Collection | LinearChannel | BoxApp
+union SectionHome = ContentHome | TvGuideHome | BrowseHome
+union HeroContent = Show | Movie
+union LinearContent = Episode | Movie
+union MyListContent = Show | Movie | LinearChannel
+union Channel = LinearChannel | AppPromotionChannel
+
+interface Title {
+  id: ID!
+  title: String!
+  synopsis: String
+  rating: Rating
+  genres: [Collection]! # @Deprecated superceded by primaryGenres, see SAAA-4312
+  allGenres: [Tag!]!
+  primaryGenres: [Tag!]!
+  tileImage(aspectRatio: Float): Image!
+  heroImage(aspectRatio: Float): Image!
+  detailImage(aspectRatio: Float): Image!
+  onMyList: Boolean!
+  soundtrack: Album
+  trailer: VodAsset
+  characters(limitTo: Int): [Character]!
+
+  # Airings of this Title on linear channels
+  slots: [LinearSlot!]!
+}
+
+type Show implements Title & WebPage & Sectioned {
+  # MAC show id (?)
+  id: ID!
+  title: String!
+  synopsis: String
+  rating: Rating
+  genres: [Collection]! # @Deprecated superceded by primaryGenres, see SAAA-4312
+  allGenres: [Tag!]!
+  primaryGenres: [Tag!]!
+
+  tileImage(aspectRatio: Float): Image!
+  heroImage(aspectRatio: Float): Image!
+  detailImage(aspectRatio: Float): Image!
+  onMyList: Boolean!
+  soundtrack: Album
+  trailer: VodAsset
+  characters(limitTo: Int): [Character]!
+  type: ShowType!
+
+  # Current or future airings of this show on linear channels
+  slots(
+    """
+    If there are upcoming slots with live content, only these will be returned, otherwise
+    all upcoming slots are returned. Note that this is not whether  the slot is currently
+    airing, but whether the slot contains a programme which will be live.
+
+    If show type is SPORT, defaults to true otherwise false
+    """
+    preferLiveOnly: Boolean
+    """
+    If show type is SPORT, defaults to EARLIEST_SLOT otherwise EARLIEST_PROGRAMME
+    """
+    order: SlotOrder
+  ): [LinearSlot!]!
+
+  # List of Sky channel brands which broadcasts this content
+  # Ex: Prime, Sky Sports, Sky Movies etc
+  brands: [Collection]!
+
+  year: Int
+  numberOfSeasons: Int! @deprecated
+  episodes(
+    """
+    Retrieve episodes for a specific season, if not specified, all episodes are returned
+    """
+    season: ID
+    """
+    If no context is specified, all contexts are included.
+    """
+    viewingContexts: [ViewingContext!]
+    """
+    Include only types that match the given EpisodeType. Defaults to include all types (HIGHLIGHT and REGULAR).
+    """
+    includeTypes: [EpisodeType!]
+    """
+    If show type is SPORT, defaults to LATEST otherwise EARLIEST
+    """
+    sort: EpisodeSort
+  ): [Episode]!
+  episodesPage(
+    """
+    Retrieve episodes for a specific season, if not specified, all episodes are returned
+    """
+    season: ID
+    """
+    If no context is specified, all contexts are included.
+    """
+    viewingContexts: [ViewingContext!]
+    """
+    Include only types that match the given EpisodeType. Defaults to include all types (HIGHLIGHT and REGULAR).
+    """
+    includeTypes: [EpisodeType!]
+    """
+    If show type is SPORT, defaults to LATEST otherwise EARLIEST
+    """
+    sort: EpisodeSort
+    """
+    Pagination params.
+    """
+    after: String
+    first: Int
+    before: String
+    last: Int
+  ): EpisodesPage!
+
+  # If no context is specified, all contexts are included.
+  # Date ranges from multiple contexts are merged.
+  seasons(viewingContexts: [ViewingContext!]): [Season]!
+  season(id: ID!): Season!
+  # If no context is specified, all contexts are included.
+  # Date ranges from multiple contexts are merged.
+  defaultSeason(viewingContexts: [ViewingContext!]): Season
+
+  # Link to in-progress, next or first episode
+  defaultEpisode: Episode
+
+  path: URIPath!
+  section: Section!
+}
+
+enum ShowType {
+  SERIES
+  SPORT
+}
+
+type Season {
+  id: ID!
+  number: Int! @deprecated
+  episodes(
+    """
+    If no context is specified, all contexts are included.
+    """
+    viewingContexts: [ViewingContext!]
+    """
+    Include only types that match the given EpisodeType. Defaults to include all types (HIGHLIGHT and REGULAR).
+    """
+    includeTypes: [EpisodeType!]
+    """
+    If show type is SPORT, defaults to LATEST otherwise EARLIEST
+    """
+    sort: EpisodeSort
+  ): [Episode]!
+  episodesPage(
+    """
+    If no context is specified, all contexts are included.
+    """
+    viewingContexts: [ViewingContext!]
+    """
+    Include only types that match the given EpisodeType. Defaults to include all types (HIGHLIGHT and REGULAR).
+    """
+    includeTypes: [EpisodeType!]
+    """
+    If show type is SPORT, defaults to LATEST otherwise EARLIEST
+    """
+    sort: EpisodeSort
+    """
+    Pagination params.
+    """
+    after: String
+    first: Int
+    before: String
+    last: Int
+  ): EpisodesPage!
+  soundtrack: Album
+}
+
+enum EpisodeType {
+  REGULAR
+  HIGHLIGHT
+}
+
+type Episode implements WebPage {
+  # MAC episode id
+  id: ID!
+  type: EpisodeType!
+  title: String!
+  synopsis: String
+  rating: Rating
+
+  image: Image!
+  show: Show!
+  season: Season
+  duration: Duration
+  number: Int
+  # The current users progress on this ep, if any
+  watchProgress: WatchProgress
+
+  # Optional because the title may be linear only, or have a past/future VOD availability
+  asset: VodAsset
+
+  path: URIPath!
+
+  # If no context is specified, all contexts are included.
+  # returns a schedule that takes user entitlements into account or null if user is not entitled to viewing
+  mySchedule(viewingContexts: [ViewingContext!]): Schedule
+  # If no context is specified, all contexts are included.
+  # returns a general VOD schedule, without taking user entitlements into account (can be null for linear schedules)
+  schedule(viewingContexts: [ViewingContext!]): Schedule
+
+  characters(limitTo: Int): [Character]!
+
+  slots: [LinearSlot!]!
+}
+
+# A tag might represent a genre, mood, and may link to a collection related to the tag
+# It doesn't necessarily map to a tag in an underlying CMS
+type Tag {
+  title: String!
+  collection: Collection
+}
+
+type Movie implements Title & WebPage & Sectioned {
+  # MAC movie id (?)
+  id: ID!
+  title: String!
+  synopsis: String
+  rating: Rating
+  genres: [Collection]! # @Deprecated superceded by primaryGenres, see SAAA-4312
+  allGenres: [Tag!]!
+  primaryGenres: [Tag!]!
+  tileImage(aspectRatio: Float): Image!
+  heroImage(aspectRatio: Float): Image!
+  detailImage(aspectRatio: Float): Image!
+  onMyList: Boolean!
+  soundtrack: Album
+  trailer: VodAsset
+  characters(limitTo: Int): [Character]!
+
+  # Airings of this show on linear channels
+  slots: [LinearSlot!]!
+
+  # List of Sky channel brands which broadcasts this content
+  # Ex: Prime, Sky Sports, Sky Movies etc
+  brands: [Collection]!
+
+  # MAC has relaxed metadata requirements
+  year: Int
+  duration: Duration
+
+  # The current users progress on this movie, if any
+  watchProgress: WatchProgress
+
+  # Optional because the title may be linear only, or have a past/future VOD availability
+  asset: VodAsset
+
+  path: URIPath!
+  section: Section!
+
+  # If no context is specified, all contexts are included.
+  # returns a schedule that takes user entitlements into account or null if user is not entitled to viewing
+  mySchedule(viewingContexts: [ViewingContext!]): Schedule
+  # If no context is specified, all contexts are included.
+  # returns a general VOD schedule, without taking user entitlements into account (can be null for linear schedules)
+  schedule(viewingContexts: [ViewingContext!]): Schedule
+}
+
+# Keep the inputs types generic so that we have flexibility to derive correct device family in backend in future
+input PlaybackDevice {
+  platform: String!
+  # Could be any versioning used by Platform Vendor. Most vendors use semver. We keep it as string to support any other platform
+  # specific versioning strategy used by particular vendor
+  osVersion: String!
+
+  drmType: DrmType!
+  drmLevel: String
+}
+type VodAsset {
+  # MAC asset id
+  id: ID!
+  rating: Rating!
+  hasParentalRestriction: Boolean!
+  duration: Duration!
+}
+
+type WatchProgress {
+  complete: Boolean!
+  lastWatched: DateTime!
+  position: Duration!
+}
+
+type Album {
+  id: ID!
+  tracks: [Track!]!
+}
+
+type Artist {
+  id: ID!
+  name: String!
+  spotifyUri: URI!
+}
+
+type Track {
+  id: ID!
+  name: String!
+  number: Int!
+  artists: [Artist!]!
+  spotifyUri: URI!
+}
+
+type SearchResults {
+  results: [Title]!
+  groupResults: [Group]!
+  groupResult(id: String!): Group
+}
+
+interface Group {
+  id: ID!
+  title: String
+  # @deprecated use __typename
+  layout: GroupLayout!
+  # content is @deprecated use contentPage instead
+  content: [GroupMember]!
+  contentPage(after: String, first: Int, before: String, last: Int): ContentPage!
+}
+
+type EpisodesPage {
+  pageInfo: PageInfo!
+  content: [Episode]!
+}
+
+type ContentPage {
+  pageInfo: PageInfo!
+  content: [GroupMember]!
+}
+
+type LandscapeRailGroup implements Group {
+  id: ID!
+  title: String
+  # @deprecated use __typename
+  layout: GroupLayout!
+  # content is @deprecated use contentPage instead
+  content: [GroupMember]!
+  contentPage(after: String, first: Int, before: String, last: Int): ContentPage!
+}
+
+type PortraitRailGroup implements Group {
+  id: ID!
+  title: String
+  # @deprecated use __typename
+  layout: GroupLayout!
+  # content is @deprecated use contentPage instead
+  content: [GroupMember]!
+  contentPage(after: String, first: Int, before: String, last: Int): ContentPage!
+}
+
+type GridGroup implements Group {
+  id: ID!
+  title: String
+  # @deprecated use __typename
+  layout: GroupLayout!
+  # content is @deprecated use contentPage instead
+  content: [GroupMember]!
+  contentPage(after: String, first: Int, before: String, last: Int): ContentPage!
+}
+
+type ContinueWatchingGroup implements Group {
+  id: ID!
+  title: String
+  # @deprecated use __typename
+  layout: GroupLayout!
+  # content is @deprecated use contentPage instead
+  content: [GroupMember]!
+  contentPage(after: String, first: Int, before: String, last: Int): ContentPage!
+}
+
+type FavouriteAppsGroup implements Group {
+  id: ID!
+  title: String
+  # @deprecated use __typename
+  layout: GroupLayout!
+  presentation: AppsGroupPresentation!
+  # content is @deprecated use contentPage instead
+  content: [GroupMember]!
+  contentPage(after: String, first: Int, before: String, last: Int): ContentPage!
+}
+
+enum AppsGroupPresentation {
+  SMALL
+  LARGE
+}
+enum GroupLayout {
+  RAIL_LANDSCAPE
+  RAIL_PORTRAIT
+  GRID
+  CONTINUE_WATCHING
+  FAVOURITE_APPS
+}
+
+input ContentFilter {
+  """
+  Return only content that is watchable by the current user. Defaults to false.
+  """
+  onlyMyContent: Boolean
+  """
+  Return only content of the specified type that is watchable in the given contexts. Defaults to
+  - SHOW_SERIES/MOVIE -> VOD + TVOD
+  - SHOW_SPORT -> linear
+  - CHANNEL -> linear
+
+  If a content type is not specified it is not restricted.
+  """
+  viewingContextsByContentType: [ContentTypeViewingContext!]
+}
+
+type DefaultContentFilter {
+  """
+  Return only content that is watchable by the current user. Defaults to false.
+  """
+  onlyMyContent: Boolean
+  """
+  Return only content of the specified type that is watchable in the given contexts. Defaults to
+  - SHOW_SERIES/MOVIE -> VOD + TVOD
+  - SHOW_SPORT -> linear
+  - CHANNEL -> linear
+
+  If a content type is not specified it is not restricted.
+  """
+  viewingContextsByContentType: DefaultContentTypeViewingContext!
+}
+
+input ContentTypeViewingContext {
+  contentTypes: [ContentType!]
+  viewingContexts: [ViewingContext!]!
+}
+#
+type DefaultContentTypeViewingContext {
+  contentTypes: [ContentType!]
+  viewingContexts: [ViewingContext!]!
+}
+
+enum ContentType {
+  """
+  @deprecated alias for SHOW_SERIES
+  """
+  SHOW
+
+  """
+  A show of type SERIES
+  """
+  SHOW_SERIES
+
+  """
+  A show of type SPORT
+  """
+  SHOW_SPORT
+  MOVIE
+  CHANNEL
+}
+
+type Collection implements WebPage & Sectioned {
+  id: ID!
+  title: String!
+  hero: HeroContent
+
+  """
+  What sort/filter options are exposed to the end user, if any, for this collection
+  """
+  customerOptions: [CollectionCustomerOption]!
+
+  defaultContentFilter: DefaultContentFilter!
+  defaultContentSort: CollectionOrder
+
+  content(
+    filter: ContentFilter
+    # list of NamedFilter ids
+    namedFilters: [ID!]
+    # defaults to the underlying order of the collection, which varies depending on the collection
+    sort: CollectionOrder
+  ): [CollectionMember]!
+
+  contentPage(
+    filter: ContentFilter
+    # list of NamedFilter ids
+    namedFilters: [ID!]
+    sort: CollectionOrder
+
+    after: String
+    first: Int
+    before: String
+    last: Int
+  ): CollectionContentPage!
+
+  # Enables breadcrumbs
+  parent: Collection
+
+  children: [Collection]!
+
+  # Additional filters for this collection, eg Drama, Action etc
+  namedFilters: [NamedFilter!]!
+
+  tileImage(aspectRatio: Float): Image!
+  logoImage(aspectRatio: Float): Image!
+
+  path: URIPath!
+  section: Section!
+}
+
+enum CollectionCustomerOption {
+  FILTER_BY_ONLY_MY_CONTENT
+  FILTER_BY_VIEWING_CONTEXT
+  SORT
+}
+
+type CollectionContentPage {
+  pageInfo: PageInfo
+  content: [CollectionMember]!
+}
+
+type NamedFilter {
+  id: ID!
+  title: String!
+}
+
+enum CollectionOrder {
+  NEWEST
+  ALPHABETICAL
+}
+
+# A section is a branch of the overall navigation hierarchy, eg sports, my-stuff, browse
+type Section {
+  id: ID!
+  # Used in nav
+  title: String!
+  home: SectionHome!
+}
+
+# Something that we can place in a section
+interface Sectioned {
+  section: Section!
+}
+
+type Hero {
+  heroList: [HeroContent!]!
+  # Time duration to display a content in hero collection after which next item should be displayed.
+  displayTime: Duration!
+}
+
+# eg "Home", "Sports"
+type ContentHome implements WebPage & Sectioned {
+  # @Deprecated use heroSet instead
+  hero: HeroContent
+  heroSet: Hero
+  groups: [Group]!
+
+  path: URIPath!
+  section: Section!
+}
+
+type TvGuideHome implements Sectioned & WebPage {
+  path: URIPath!
+  section: Section!
+}
+
+type BrowseHome implements Sectioned & WebPage {
+  path: URIPath!
+  section: Section!
+  # eg TV Shows, Movies, Sports, Kids, Channels, Downloadble
+  categories(
+    """
+    Exclude categories relevant to the given viewing contexts, defaults to no exclusions.
+    """
+    excludeViewingContexts: [ViewingContext!]
+  ): [Collection]!
+  """
+  The default category to show for a given viewing context, eg downloadable
+  """
+  category(viewingContexts: [ViewingContext!]!): Collection!
+}
+
+#  A resource that is modelled as a web page addressable by a URL in a browser,
+#  and that potentially appears as a page in search engine results and sitemaps
+interface WebPage {
+  path: URIPath!
+
+  # TODO various seo properties
+}
+
+type LinearChannelGroup {
+  id: ID!
+  title: String!
+  channels: [LinearChannel]!
+}
+
+type ChannelGroup {
+  id: ID!
+  title: String!
+  channels: [Channel]!
+}
+
+# Used for promoting some of the apps installed in Skybox to appear as a channel on TV Guide. (Ex: Netflix)
+type AppPromotionChannel {
+  id: ID!
+  appId: String!
+  # Represents the actual app name. ex: Netflix, Disney etc
+  title: String!
+  number: Int!
+  tileImage(aspectRatio: Float): Image!
+
+  # There wont be multiple slots for Streaming apps. We display a single slot with a background promotion image in tv-guide page.
+  # slotImage - refers to the background image
+  # slotPromotionTitle - One liner caption of a promotional text
+  # slotPromotionSubtitle - Could be a detailed description of the promotion or another one liner summary text
+  slotImage(aspectRatio: Float): Image!
+  slotPromotionTitle: String!
+  slotPromotionSubtitle: String
+
+  # Below 4 attributes are to be used in displaying promotional content in Live TV page
+  # For example, we show below promotional information for Netflix
+  # --------------------------------------------------------------------------------------#
+  # Featured Partner                                                                      #
+  # Netflix                                                                               #
+  # Streaming App                                                                         #
+  #                                                                                       #
+  # Watch the most talked-about TV. Watch anywhere, anytime. No commercials. No contracts.#
+  # --------------------------------------------------------------------------------------#
+  # In above promotion, partnership="Featured Partner",
+  # promotionBackgroundImage denotes the background image to be displayed in Live TV page,
+  # promotionTitle="Streaming App",promotionSubtitle = "Watch the most taslked-about...... "
+
+  partnership: String!
+  promotionBackgroundImage(aspectRatio: Float): Image!
+  promotionTitle: String!
+  promotionSubtitle: String
+}
+
+type LinearChannel implements WebPage {
+  id: ID!
+  path: URIPath!
+  tileImage(aspectRatio: Float): Image!
+  title: String!
+  number: Int!
+  onMyList: Boolean!
+  """
+  A DVB triplet, identifies a Digital Video Broadcasting (DVB) service for channel tuning.
+  The schema of the triplet is: dvb://network_id.transport_id.service_id
+  Example value: dvb://5000.1.101
+  """
+  dvbTriplet: URI
+
+  # Returns the slots which intersect or are contained by the given time interval,
+  # optionally returning additional slots following specififed by "next"
+  # Times default to current server time
+  # For example,
+  # slots() --> returns current slot only
+  # slots(next: 1) --> returns current and next slot
+  # slots(from: "2020-06-23T21:01:28Z") --> returns the slot that was current at 21:01 UTC
+  # slots(from: "2020-06-23T00:00:00Z", to: "2020-06-23T00:00:00Z") --> returns all slots for the day, including those that span midnight on either side
+  slots(from: DateTime, to: DateTime, next: Int): [LinearSlot]!
+
+  # Returns a full 24 hour day of slots, including slots that span the start/end of the day
+  # Defaults to the current day (in the broadcaster's timezone), which can be overriden by specifing a date in ISO format (eg 2020-08-22)
+  # The timzone used to determine the current day and its start/end times can be overriden by specifying a timezone as an offset in ISO 8601 format, eg +05:30
+  slotsForDay(timezone: String, date: LocalDate): LinearSlotsForDay!
+
+  # Returns the single slot which intersects the given time,
+  # or a slot before or after this time optional specified by the offset (which defaults to zero)
+  # For example.
+  # slot() --> returns current slot
+  # slot(offset: 1) --> returns next slot
+  # slot(at: "2020-06-23T00:00:00Z") --> returns slot that was current at 21:01 UTC
+  slot(at: DateTime, offset: Int): LinearSlot!
+
+  # returns a schedule that takes user entitlements into account or null if user is not entitled to viewing
+  mySchedule: Schedule
+
+  # returns a general Linear schedule, without taking user entitlements into account, or null if the channel
+  # is unavailable
+  schedule: Schedule
+}
+
+type LinearSlotsForDay {
+  date: LocalDate!
+  timezone: String! # ISO 8601 format, eg +05:30
+  slots: [LinearSlot]!
+}
+
+type LinearSlot {
+  id: ID!
+  channel: LinearChannel!
+  start: DateTime!
+  end: DateTime!
+  rating: Rating
+  hasParentalRestriction: Boolean!
+
+  # Denotes if a particular slot is recordable at episode, series level
+  # recordings: [EPISODE] - only episode is recordable
+  # recordings [EPISODE, SERIES] - Both episode and series are recordable
+  recordOptions: [RecordType]!
+
+  # Gaps in the schedule will be slots with null programmes
+  programme: LinearContent
+  """
+  Whether this slot contains a live broadcast. This flag will be true even
+  if the slot is in the future or past: it represents whether the content was/will be
+  live at the time the slot is current
+  """
+  live: Boolean!
+
+  """
+  How long in the past this slot can be played from the live buffer, may be zero
+  if playback from the buffer is not permitted.
+  """
+  reverseEpgWindow: Duration!
+  """
+  Whether playback from the beginning of the slot from the live buffer is permitted.
+  """
+  allowPlayFromStart: Boolean!
+
+  """
+  If present, then this slot contains content that requires a specific purchase to view.
+  """
+  payPerViewOffer: CustomerPayPerViewOffer
+}
+
+type CustomerPayPerViewOffer {
+  id: ID!
+  price: MonetaryAmount!
+  purchases: [CustomerLinearPayPerViewPurchase!]!
+  slots: [LinearSlot!]!
+}
+
+type CustomerLinearPayPerViewPurchase {
+  purchasedAt: DateTime!
+  offer: CustomerPayPerViewOffer!
+  """
+  The device this purchase is tied to, if any
+  """
+  deviceId: ID
+}
+
+enum EpisodeSort {
+  """
+  # Sort by season/episode number, descendig (S2E9, ... S1E2, S1E1
+  @Deprecated renamed to LATEST
+  """
+  EPISODE_NUMBER_DESCENDING
+  EARLIEST
+  LATEST
+}
+
+enum SlotOrder {
+  """
+  Episodes can air out of order, particular if repeat airings are involved.
+  This will return slots in the natural order of the programmes they contain
+  eg S1E1, S1E2, S1E1, S2E1, reglardess of the slot date.
+  """
+  EARLIEST_PROGRAMME
+  """
+  Order by slot start time, eg 1pm, 2pm, 3pm
+  """
+  EARLIEST_SLOT
+}
+
+### Playback
+# Eventually we'll want types for not logged in/not entitled
+union LinearPlaybackResponse =
+    LinearPlaybackSources
+  | ConcurrentStreamsExceeded
+  | SubscriptionNeeded
+  | Geoblocked
+  | PayPerViewPurchaseMissing
+union VodPlaybackResponse =
+    VodPlaybackSources
+  | ConcurrentStreamsExceeded
+  | SubscriptionNeeded
+  | Geoblocked
+  | PlaybackNotAllowed
+  | TvodPurchaseMissing
+  | TvodPurchaseExpired
+  | TvodPurchaseForDifferentDevice
+
+"""
+Playback is not permitted for title on this device/OS. Currently only applies to Disney content with specific
+rules that block playback, eg Disney does not allow playback on Windows < 7 SP1.
+
+Ideally this response would be extended to indicate what rule is actually preventing playback in a structured way, currently this type is overly generic.
+"""
+type PlaybackNotAllowed {
+  message: String!
+}
+
+type ConcurrentStreamsExceeded {
+  streamLimit: Int!
+}
+
+# Playback is blocked because the user is outside the permitted geographical region
+type Geoblocked {
+  # The user's region that was blocked, as an ISO 3166-1 code, eg AU
+  countryCode: String!
+}
+
+type SubscriptionNeeded {
+  """
+  Any one of these subscriptions is required, not all
+  """
+  subscriptions: [SkySubscription]!
+}
+
+"""
+A pay-per-view purchase is required for playback, but missing for this customer.
+"""
+type PayPerViewPurchaseMissing {
+  offer: CustomerPayPerViewOffer!
+}
+
+"""
+A TVOD purchase is required for playback, but missing for this customer.
+"""
+type TvodPurchaseMissing {
+  offer: CustomerTvodOffer!
+}
+
+"""
+A TVOD purchase is required for playback, but this customer's purchase has expired.
+"""
+type TvodPurchaseExpired {
+  purchase: CustomerTvodPurchase!
+}
+
+"""
+A TVOD purchase is required for playback, but this customer's purchase is bound to a different device.
+"""
+type TvodPurchaseForDifferentDevice {
+  purchases: [CustomerTvodPurchase!]!
+}
+
+type PlaybackHeartbeatResponse {
+  timeToNextHeartbeat: Duration!
+}
+
+interface PlaybackSources {
+  playbackSource(drmType: DrmType!): PlaybackSource!
+  timeToNextHeartbeat: Duration!
+}
+
+type LinearPlaybackSources implements PlaybackSources {
+  playbackSource(drmType: DrmType!): PlaybackSource!
+  timeToNextHeartbeat: Duration!
+
+  # @Deprecated use playbackSource
+  streamUri(drmType: DrmType!): URI!
+  # @Deprecated use playbackSource
+  drmLicense(drmType: DrmType!): PlaybackDrmLicense!
+}
+
+type VodPlaybackSources implements PlaybackSources {
+  playbackSource(drmType: DrmType!): PlaybackSource!
+  timeToNextHeartbeat: Duration!
+
+  # See https://apis.support.brightcove.com/playback/references/reference_v1.html
+  # We don't attempt to model the brightcove playback api as part of our schema
+  # @Deprecated, we want to move away from relying the brightcove API
+  brightcovePlaybackV1: JSON!
+}
+
+type PlaybackSource {
+  streamUri: URI!
+  drmLicense: PlaybackDrmLicense!
+  emeHeaders: [EmeHeader!]!
+}
+
+# See https://github.com/videojs/videojs-contrib-eme#emeheaders,
+# a set of headers intended to be added to all Encrypted Media Extensions requests by the client
+type EmeHeader {
+  name: String!
+  value: String!
+}
+
+interface PlaybackDrmLicense {
+  licenseUri: URI!
+}
+
+type PlayreadyLicense implements PlaybackDrmLicense {
+  licenseUri: URI!
+}
+
+type WidevineLicense implements PlaybackDrmLicense {
+  licenseUri: URI!
+}
+
+type FairplayLicense implements PlaybackDrmLicense {
+  licenseUri: URI!
+  certificateUri: URI!
+}
+
+enum DrmType {
+  WIDEVINE
+  PLAYREADY
+  FAIRPLAY
+}
+
+### Device Registration
+type DeviceRegistrationLimitExceeded {
+  maxDeviceLimit: Int!
+}
+
+type DeviceDeactivationLimitExceeded {
+  maxDeviceLimit: Int!
+}
+
+enum DeviceFamily {
+  HANDSET
+  TABLET
+  TV
+  BROWSER
+  # Introduced only for backward compatibility with Legacy skygo device records
+  UNKNOWN
+}
+input RegisterDeviceInput {
+  deviceId: ID!
+  model: String
+  name: String
+  family: DeviceFamily
+}
+
+type Device {
+  deviceId: ID!
+  model: String
+  family: DeviceFamily
+  name: String
+  active: Boolean!
+  registeredOn: DateTime!
+  lastUsed: DateTime!
+}
+
+# Generic response message for device gqls
+type GenericDeviceResponse {
+  message: String
+}
+
+"""
+@Deprecated, split into CustomerAccount and CustomerProfile
+"""
+union ## Sky Decoder Device Activation
+SkyDecoderActivationResponse =
+    SkyDecoderActivationSuccess
+  | SkyDecoderAlreadyActivated
+  | SkyDecoderAccountMismatch
+  | SkyDecoderNotFound
+  | SkyAccountNotLinked
+
+type SkyDecoderActivationSuccess {
+  message: String
+}
+
+type SkyDecoderAlreadyActivated {
+  message: String
+}
+
+type SkyAccountNotLinked {
+  message: String
+}
+type SkyDecoderAccountMismatch {
+  message: String
+}
+
+type SkyDecoderNotFound {
+  message: String
+}
+
+type User {
+  subscriptions: [SkySubscription!]!
+  parentalSettings: ParentalSettings!
+  # By default, retireves only active devices if no args are passed.
+  devices(includeInactive: Boolean): [Device!]!
+  decoders: [SkyDecoderBox!]!
+  # attributes that help in decision making with Split.io
+  attributes: [UserAttributes!]!
+}
+
+type CustomerAccount {
+  id: ID!
+  tier: CustomerAccountTier!
+  subscriptions: [SkySubscription!]!
+  # By default, retireves only active devices if no args are passed.
+  devices(includeInactive: Boolean): [Device!]!
+  decoders: [SkyDecoderBox!]!
+  decoder(id: ID!): SkyDecoderBox!
+  parentalSettings: ParentalSettings!
+  attributes: [CustomerAccountAttribute!]!
+  """
+   Never returns an empty list
+  """
+  profiles: [CustomerProfile!]!
+  """
+  Return a specific profile by ID, or the default profile if no ID is specified.
+  """
+  profile(id: ID): CustomerProfile
+  purchases(includeExpired: Boolean = false): [CustomerPurchase!]!
+  tvodPurchases(includeExpired: Boolean = false): [CustomerTvodPurchase!]!
+  payPerViewPurchases(includeExpired: Boolean = false): [CustomerLinearPayPerViewPurchase!]!
+  notifications(includeConsumed: Boolean! = false): [CustomerNotification!]!
+}
+
+union TvodContent = Movie
+union CustomerPurchase = CustomerTvodPurchase | CustomerLinearPayPerViewPurchase
+
+interface CustomerAccountTier {
+  """
+   Dummy field to avoid empty type limitation of GraphQL
+  """
+  _: Void
+}
+
+type FreeCustomerAccountTier implements CustomerAccountTier {
+  _: Void
+}
+
+type SkyCustomerAccountTier implements CustomerAccountTier {
+  status: SkyCustomerAccountStatus!
+  accountNumber: ID!
+  houseNumbers: [ID!]!
+  _: Void
+}
+
+enum SkyCustomerAccountStatus {
+  ACTIVE
+  SUSPENDED
+  FORMER
+}
+
+union CreateCustomerProfileResponse = CustomerProfile | ProfilesLimitExceeded
+
+type CustomerProfile {
+  id: ID!
+  name: String!
+  customerProfileAvatar: CustomerProfileAvatar!
+  isDefault: Boolean!
+  notifications(includeConsumed: Boolean! = false): [CustomerProfileNotification!]!
+}
+
+type ProfilesLimitExceeded {
+  maxProfiles: Int!
+}
+
+type CustomerProfileAvatar {
+  id: ID!
+  image: Image!
+}
+
+type CustomerProfileAvatarGroup {
+  id: ID!
+  title: String!
+  customerProfileAvatars: [CustomerProfileAvatar]!
+}
+
+interface CustomerNotification {
+  id: ID!
+  """
+   When the notification was triggered
+  """
+  sentAt: DateTime!
+  """
+  A "consumed" notification is one that has been marked as actioned or read by a profile,
+  and is retained only for traceability, potentially only for a limited amount of time.
+  """
+  consumed: Boolean!
+  consumedAt: DateTime
+}
+
+interface CustomerProfileNotification {
+  profile: CustomerProfile!
+}
+
+interface DeviceNotification {
+  device: SkyDevice!
+}
+
+"""
+An instruction to schedule a recording for a specific slot (single episode or
+a movie) on a specific box
+"""
+type RemoteRecordSlotCommand implements CustomerNotification & CustomerProfileNotification & DeviceNotification {
+  id: ID!
+  profile: CustomerProfile!
+  consumed: Boolean!
+  consumedAt: DateTime
+  sentAt: DateTime!
+
+  """
+   The box the record command was issued to
+  """
+  device: SkyDevice!
+  """
+   The slot to record
+  """
+  slot: LinearSlot!
+}
+
+"""
+An instruction to schedule an ongoing recording for all new episodes of a show
+on a specific box
+"""
+type RemoteRecordShowCommand implements CustomerNotification & CustomerProfileNotification & DeviceNotification {
+  id: ID!
+  profile: CustomerProfile!
+  consumed: Boolean!
+  consumedAt: DateTime
+  sentAt: DateTime!
+
+  """
+   The box the record command was issued to
+  """
+  device: SkyDevice!
+  """
+   The show to record
+  """
+  show: Show!
+}
+
+type BoxApp {
+  # Google Play Store applicationId, eg "com.example.myapp"
+  id: ID!
+  favourite: Boolean!
+  canUnfavourite: Boolean!
+  mandatory: Boolean!
+  lastOpened: DateTime
+  suggestedTileImage(aspectRatio: Float): Image
+}
+
+type UserAttributes {
+  name: String!
+  value: String!
+}
+
+type CustomerAccountAttribute {
+  name: String!
+  value: String!
+}
+
+type ParentalSettings {
+  #deprecated
+  parentalControlEnabled: Boolean!
+  parentalControl: ParentalControl!
+  approvedClassification: Classification!
+  # failure if needed or nothing if it's ok to enter a pin
+  pinValidationStatus: PinValidationFailure
+}
+
+enum ParentalControl {
+  ENABLED
+  DISABLED
+  NOT_SET
+}
+
+union RegisterDeviceResponse = Device | DeviceRegistrationLimitExceeded
+union DeactivateDeviceResponse = GenericDeviceResponse | DeviceDeactivationLimitExceeded
+
+type SkyDecoderBox implements SkyDevice {
+  id: ID!
+  name: String
+  recordCapable: Boolean!
+  notifications(includeConsumed: Boolean! = false): [DeviceNotification!]!
+}
+
+interface SkyDevice {
+  id: ID!
+  notifications(includeConsumed: Boolean! = false): [DeviceNotification!]!
+}
+
+enum RecordType {
+  EPISODE
+  SERIES
+}
+
+input RecordInput {
+  channelId: ID!
+  startTime: DateTime!
+  skyDecoderBoxId: ID!
+  recordSeries: Boolean!
+}
+
+union PinValidationResponse = PinValidationResult | PinValidationFailure
+
+type PinValidationResult {
+  # nr of remainingAttempts left during the checked period
+  remainingAttempts: Int!
+  isValid: Boolean!
+}
+
+type PinValidationFailure {
+  # nr of attempts during the checked period
+  attempts: Int!
+  timeoutEnd: DateTime!
+}
+
+type Character {
+  """
+  @deprecated
+  Character names are going to be removed from MAC, in the meantime
+  this will always return an empty string for character name.
+  Eventually this type will be replaced with a more generic credit/role model.
+  """
+  characterName: String!
+  actorName: String!
+}
+
+union PurchaseTvodResponse =
+    CustomerTvodPurchase
+  | InvalidCustomerAccountForPurchase
+  | CustomerTvodDuplicatePurchaseError
+union PurchasePayPerViewResponse =
+    CustomerLinearPayPerViewPurchase
+  | InvalidCustomerAccountForPurchase
+  | CustomerPayPerViewDuplicatePurchaseError
+
+type CustomerTvodPurchase {
+  purchasedAt: DateTime!
+  offer: CustomerTvodOffer!
+  """
+  The device this purchase is tied to, if any
+  """
+  deviceId: ID
+}
+
+type InvalidCustomerAccountForPurchase {
+  """
+  Not intended for display.
+  """
+  reason: String!
+  tier: CustomerAccountTier
+}
+
+type CustomerTvodDuplicatePurchaseError {
+  existingPurchase: CustomerTvodPurchase!
+}
+
+type CustomerPayPerViewDuplicatePurchaseError {
+  existingPurchase: CustomerLinearPayPerViewPurchase!
+}
+
+type CustomerTvodOffer {
+  id: ID!
+  price: MonetaryAmount!
+  startingPeriod: Duration!
+  rentalPeriod: Duration!
+  expressRelease: Boolean! @deprecated
+  """
+  Returns any active, non-expired purchase of this offer.
+  @Deprecated, use purchases
+  """
+  purchase: CustomerTvodPurchase
+
+  """
+  Returns purchases of this offer by this customer, if any.
+  """
+  purchases(includeExpired: Boolean = false): [CustomerTvodPurchase!]!
+  content: TvodContent!
+  schedule: Schedule!
+}
+
+type Schedule {
+  dateRange: DateRange!
+  subscriptions: [SkySubscription]!
+  tvodOffer: CustomerTvodOffer
+}
+
+# An image with multple crops at different aspect ratios
+type ImageRenditionSet {
+  image(aspectRatio: Float): Image!
+  images: [Image!]!
+}
+
+type Image {
+  uri: URI!
+  # aspectRatio: Float!
+}
+
+type Rating {
+  classification: Classification!
+  advisories: [AudienceAdvisory!]!
+}
+
+# "_" is used, because integers cannot be enum values on their own
+enum Classification {
+  _G
+  _PG
+  _M
+  _16
+  _18
+}
+
+enum AudienceAdvisory {
+  C
+  L
+  V
+  S
+}
+
+type MonetaryAmount {
+  amount: Decimal!
+  currency: CurrencyCode!
+}
+
+#with Sky prefix, because Subscription itself is a GQL reserver keyword (like Query and Mutation)
+type SkySubscription {
+  id: ID!
+  # title (most probably a copy of the ID)
+  title: String!
+}
+
+type DateRange {
+  start: DateTime!
+  end: DateTime
+}
+
+enum ViewingContext {
+  VOD
+  CATCHUP
+  DOWNLOAD
+  TVOD
+  LINEAR
+  PAY_PER_VIEW
+}
+
+type PageInfo {
+  startCursor: ID
+  endCursor: ID
+  hasPreviousPage: Boolean!
+  hasNextPage: Boolean!
+}
+
+enum ProductCode {
+  NEON
+  SKY_BOX
+  SKY_POD
+  SKY_GO
+}
+
+type CatalogCredit {
+  person: CatalogPerson!
+  role: CatalogCreditRole!
+}
+
+enum CatalogCreditRole {
+  ACTOR
+  CONTESTANT
+  DIRECTOR
+  EXECUTIVE_PRODUCER
+  HOST
+  JUDGE
+  NARRATOR
+  PRODUCER
+  SELF
+  VOICE
+}
+
+type CatalogPerson {
+  firstName: String
+  lastName: String
+  """
+  Combined first/last name
+  """
+  name: String!
+}
+
+# Absolute url with domain, eg https://skyone.co.nz/shows/true-detective
+scalar URI
+
+# URI path only, eg /shows/true-detective
+scalar URIPath
+
+# day of year, in ISO-8601 YYYY-MM-dd format, eg 2020-08-22
+scalar LocalDate
+
+# offset date time in ISO-8601 YYYY-MM-dd'T'HH:mm:ssXXXXX format, eg 2020-06-16T20:00:43.765156Z
+scalar DateTime
+
+# length of time in ISO-8601  PTnHnMnS format, eg PT8H6M12.345S
+scalar Duration
+
+# Arbitrary untyped JSON
+scalar JSON
+
+# Used to indicate a null response
+scalar Void
+scalar Decimal
+
+scalar CurrencyCode
